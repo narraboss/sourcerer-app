@@ -25,6 +25,10 @@ import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.util.io.DisabledOutputStream
 import java.util.LinkedList
 
+import java.io.BufferedReader
+import java.io.FileReader
+import java.io.File
+
 data class JgitPair(val commit: RevCommit, val list: List<JgitDiff>)
 data class JgitDiff(val diffEntry: DiffEntry, val editList: EditList)
 
@@ -38,6 +42,7 @@ object CommitCrawler {
     private val LOCAL_HEAD = "HEAD"
     private val REFS = listOf(REMOTE_HEAD, REMOTE_MASTER_BRANCH,
                               LOCAL_MASTER_BRANCH, LOCAL_HEAD)
+    private val CONF_FILE_PATH = ".sourcerer-conf"
 
     fun getDefaultBranchHead(git: Git): ObjectId {
         for (ref in REFS) {
@@ -140,6 +145,7 @@ object CommitCrawler {
                 continue
             }
 
+            var ignoredPaths = getIgnoredPaths(repo)
             val diffEntries = df.scan(parentCommit, commit)
             val diffEdits = diffEntries
             .filter { diff ->
@@ -155,6 +161,21 @@ object CommitCrawler {
                 val stream = try { repo.open(fileId).openStream() }
                 catch (e: Exception) { null }
                 stream != null && !RawText.isBinary(stream)
+            }
+            .filter { diff ->
+                val filePath =
+                    if (diff.getNewPath() != DiffEntry.DEV_NULL) {
+                        diff.getNewPath()
+                    } else {
+                        diff.getOldPath()
+                    }
+                if (filePath == CONF_FILE_PATH) {
+                    ignoredPaths = getIgnoredPaths(repo)
+                }
+
+                ignoredPaths.any { path ->
+                    filePath.startsWith(path)
+                }
             }
             .map { diff ->
                 JgitDiff(diff, df.toFileHeader(diff).toEditList())
@@ -245,6 +266,36 @@ object CommitCrawler {
             }
             return content
         } catch (e: Exception) {
+            listOf()
+        }
+    }
+
+    /**
+     * Return a list of paths that should be ignored in commit analysis.
+     */
+    private fun getIgnoredPaths(repo: Repository): List<String> {
+        return try {
+            val list = mutableListOf<String>()
+            val file = File(repo.workTree, CONF_FILE_PATH)
+            val reader = BufferedReader(FileReader(file))
+            var collectIgnored = false
+            for (line in reader.lines()) {
+                if (line == "" || line.startsWith("#")) {
+                    continue
+                }
+
+                if (line.startsWith("[")) {
+                    collectIgnored = (line == "[ignore]")
+                    continue
+                }
+
+                if (collectIgnored) {
+                    list.add(line)
+                }
+            }
+            list
+        }
+        catch(e: Exception) {
             listOf()
         }
     }
