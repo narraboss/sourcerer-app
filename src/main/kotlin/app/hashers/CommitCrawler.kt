@@ -12,6 +12,10 @@ import app.model.DiffRange
 import app.model.Repo
 import app.utils.EmptyRepoException
 import io.reactivex.Observable
+import java.io.BufferedReader
+import java.io.FileReader
+import java.io.File
+import java.io.InputStreamReader
 import org.apache.commons.codec.digest.DigestUtils
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry
@@ -22,12 +26,10 @@ import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.revwalk.RevWalk
+import org.eclipse.jgit.treewalk.filter.PathFilter
+import org.eclipse.jgit.treewalk.TreeWalk
 import org.eclipse.jgit.util.io.DisabledOutputStream
 import java.util.LinkedList
-
-import java.io.BufferedReader
-import java.io.FileReader
-import java.io.File
 
 data class JgitPair(val commit: RevCommit, val list: List<JgitDiff>)
 data class JgitDiff(val diffEntry: DiffEntry, val editList: EditList)
@@ -109,6 +111,18 @@ object CommitCrawler {
         df.setRepository(repo)
         df.setDetectRenames(true)
 
+        val confTreeWalk = TreeWalk(repo)
+        confTreeWalk.addTree(head.getTree())
+        confTreeWalk.setFilter(PathFilter.create(CONF_FILE_PATH))
+
+        var ignoredPaths =
+            if (confTreeWalk.next()) {
+                getIgnoredPaths(repo, confTreeWalk.getObjectId(0))
+            }
+            else {
+                listOf()
+            }
+
         var commitCount = 0
         revWalk.markStart(head)
         var commit: RevCommit? = revWalk.next()  // Move the walker to the head.
@@ -145,7 +159,6 @@ object CommitCrawler {
                 continue
             }
 
-            var ignoredPaths = getIgnoredPaths(repo)
             val diffEntries = df.scan(parentCommit, commit)
             val diffEdits = diffEntries
             .filter { diff ->
@@ -170,10 +183,11 @@ object CommitCrawler {
                         diff.getOldPath()
                     }
                 if (filePath == CONF_FILE_PATH) {
-                    ignoredPaths = getIgnoredPaths(repo)
+                    ignoredPaths =
+                        getIgnoredPaths(repo, diff.getOldId().toObjectId())
                 }
 
-                ignoredPaths.any { path ->
+                !ignoredPaths.any { path ->
                     filePath.startsWith(path)
                 }
             }
@@ -273,11 +287,16 @@ object CommitCrawler {
     /**
      * Return a list of paths that should be ignored in commit analysis.
      */
-    private fun getIgnoredPaths(repo: Repository): List<String> {
+    private fun getIgnoredPaths(repo: Repository, objectId: ObjectId?): List<String> {
         return try {
+            if (objectId == null) {
+                return listOf()
+            }
+
             val list = mutableListOf<String>()
-            val file = File(repo.workTree, CONF_FILE_PATH)
-            val reader = BufferedReader(FileReader(file))
+            val fileLoader = repo.open(objectId)
+            val reader =
+                BufferedReader(InputStreamReader(fileLoader.openStream()))
             var collectIgnored = false
             for (line in reader.lines()) {
                 if (line == "" || line.startsWith("#")) {

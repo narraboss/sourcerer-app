@@ -55,14 +55,21 @@ class IgnorePathsTest : Spek({
                                 listOf("[ignore]", "ignore.py", "#test.py"))
 
             testRepo.createFile("test.py", lines)
-
             testRepo.commit(message = "commit1", author = author)
 
             testRepo.createFile("ignore.py", lines)
             testRepo.commit(message = "commit2", author = author)
 
-            val errors = mutableListOf<Throwable>()
+            // Uncomment test.py file in config and delete it. The change
+            // should be ignored for statistics.
+            testRepo.deleteLines(".sourcerer-conf", 1, 1)
+            testRepo.insertLines(".sourcerer-conf", 1, listOf("test.py"))
+            testRepo.commit(message = "commit3", author = author)
 
+            testRepo.deleteFile("test.py")
+            testRepo.commit(message = "commit4", author = author)
+
+            val errors = mutableListOf<Throwable>()
             CommitHasher(serverRepo, mockApi, listOf("rehashes"), emails)
                 .updateFromObservable(observable, { e -> errors.add(e) })
             if (errors.size > 0) {
