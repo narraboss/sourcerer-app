@@ -263,9 +263,7 @@ class ExtractorTest : Spek({
         it("extracts library name") {
             val lib = "Qt"
             val line = "#include <QFileDialog>"
-            val actualLineImports = CppExtractor().extractImports(listOf(line))
-            print(actualLineImports)
-//            assertExtractsImport(lib, line, CppExtractor())
+            assertExtractsImport(lib, line, CppExtractor())
         }
     }
 
