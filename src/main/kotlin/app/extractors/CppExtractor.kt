@@ -38,10 +38,12 @@ class CppExtractor : ExtractorInterface {
             }
         }
         val libraries = imports.map { MULTI_IMPORT_TO_LIB.getOrDefault(it, it) }
-                               .map { if (it.startsWith("Q")) "Qt" else
-                                        if (it.startsWith("Lzma")) "Lzma" else
-                                            if (it.startsWith("Ogre")) "Ogre"
-                                            else it}
+                               .map { import -> when {
+                                   import.startsWith("Q") -> "Qt"
+                                   import.startsWith("Lzma") -> "Lzma"
+                                   import.startsWith("Ogre") -> "Ogre"
+                                   else -> import
+                               }}
                                .toSet().toList()
         return libraries
     }
