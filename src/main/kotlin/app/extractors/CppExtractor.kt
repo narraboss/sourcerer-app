@@ -36,8 +36,11 @@ class CppExtractor : ExtractorInterface {
                 imports.add(lineLib)
             }
         }
-
+        println("Imports")
+        println(imports)
         val libraries = imports.map { MULTI_IMPORT_TO_LIB.getOrDefault(it, it) }
+                               .map { if (it.startsWith("Q")) "Qt" else it}
+                               .toSet().toList()
         return libraries
     }
 
