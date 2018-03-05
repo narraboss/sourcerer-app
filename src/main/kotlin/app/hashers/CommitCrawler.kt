@@ -182,7 +182,11 @@ object CommitCrawler {
                     } else {
                         diff.getOldPath()
                     }
-                if (filePath == CONF_FILE_PATH) {
+
+                // Update ignored paths list. The config file has retroactive
+                // force, i.e. if it was added at this commit, then we presume
+                // it is applied to all commits, preceding this commit.
+                if (diff.getOldPath() == CONF_FILE_PATH) {
                     ignoredPaths =
                         getIgnoredPaths(repo, diff.getOldId().toObjectId())
                 }
