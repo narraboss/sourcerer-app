@@ -1,6 +1,5 @@
-// Copyright 2017 Sourcerer Inc. All Rights Reserved.
-// Author: Liubov Yaronskaya (lyaronskaya@sourcerer.io)
-// Author: Anatoly Kislov (anatoly@sourcerer.io)
+// Copyright 2018 Sourcerer Inc. All Rights Reserved.
+// Author: Alexander Surkov (alex@sourcerer.io)
 
 package test.tests.hashers
 
@@ -51,23 +50,26 @@ class IgnorePathsTest : Spek({
         val observable = CommitCrawler.getObservable(testRepo.git, serverRepo)
 
         it("t1") {
-            testRepo.createFile(".sourcerer-conf",
-                                listOf("[ignore]", "ignore.py", "#test.py"))
-
             testRepo.createFile("test.py", lines)
             testRepo.commit(message = "commit1", author = author)
 
             testRepo.createFile("ignore.py", lines)
             testRepo.commit(message = "commit2", author = author)
 
+            // Add config, ignore.py from previous commit should be
+            // ignored for stats.
+            testRepo.createFile(".sourcerer-conf",
+                                listOf("[ignore]", "ignore.py", "#test.py"))
+            testRepo.commit(message = "commit3", author = author)
+
             // Uncomment test.py file in config and delete it. The change
             // should be ignored for statistics.
             testRepo.deleteLines(".sourcerer-conf", 1, 1)
             testRepo.insertLines(".sourcerer-conf", 1, listOf("test.py"))
-            testRepo.commit(message = "commit3", author = author)
+            testRepo.commit(message = "commit4", author = author)
 
             testRepo.deleteFile("test.py")
-            testRepo.commit(message = "commit4", author = author)
+            testRepo.commit(message = "commit5", author = author)
 
             val errors = mutableListOf<Throwable>()
             CommitHasher(serverRepo, mockApi, listOf("rehashes"), emails)

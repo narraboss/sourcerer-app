@@ -192,7 +192,12 @@ object CommitCrawler {
                 }
 
                 !ignoredPaths.any { path ->
-                    filePath.startsWith(path)
+                    if (path.endsWith("/")) {
+                        filePath.startsWith(path)
+                    }
+                    else {
+                        path == filePath
+                    }
                 }
             }
             .map { diff ->
